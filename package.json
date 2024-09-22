@@ -1,0 +1,22 @@
+{
+  "name": "secure-cache-nest",
+  "version": "1.0.0",
+  "description": "A lightweight and secure JavaScript library for storing data in LocalStorage and IndexedDB.",
+  "main": "SecureCacheNest/secure-cache-nest.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "localstorage",
+    "indexeddb",
+    "encryption",
+    "compression",
+    "synchronization"
+  ],
+  "author": "Wertoquri",
+  "license": "MIT",
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "lz-string": "^1.5.0"
+  }
+}
