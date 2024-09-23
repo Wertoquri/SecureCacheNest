@@ -58,7 +58,7 @@ To use via CDN, add these lines to your HTML file:
 ```html
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
-<script src="path/to/secure-cache-nest.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/secure-cache-nest@1.0.0/+esm"></script>
 ```
  
 ## Usage Examples
