@@ -22,6 +22,9 @@
    - [History Management](#history-management)
    - [Data Backup and Restore](#data-backup-and-restore)
    - [Syncing Between Tabs](#syncing-between-tabs)
+   - [Synchronizing with Server](#synchronizing-with-server)
+   - [Session Management](#session-management)
+   - [Priority-based Cleanup](#priority-based-cleanup)
 5. [Configuration](#configuration)
    - [Encryption](#encryption)
    - [Compression](#compression)
@@ -35,6 +38,11 @@ The library provides:
 - Support for data encryption for security.
 - Data compression for saving space.
 - Synchronization with Google Drive and support for IndexedDB.
+- History management for tracking changes.
+- Caching to improve performance.
+- Session management for automatic data clearance.
+- Backup and restore functionality for data safety.
+- Synchronization between browser tabs.
 
 ## Requirements
 
@@ -112,6 +120,39 @@ storage.getItemIndexedDB('userIndexedDB').then(data => {
     console.log(data); // { name: 'Alice', age: 28 }
 });
 
+// Caching data
+storage.setItemWithCache('cacheKey', { name: 'Cached Data' });
+const cachedData = storage.getItemWithCache('cacheKey');
+console.log(cachedData); // { name: 'Cached Data' }
+
+// History management
+storage.setItemWithHistory('historyKey', { action: 'created' });
+const history = storage.getHistory('historyKey');
+console.log(history); // [{ action: 'created', timestamp: Date }]
+
+// Data backup and restore
+storage.backupData('backup.json');
+
+// Restore data from a file (assuming you have a file input to get the file)
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    storage.restoreData(file);
+});
+
+// Syncing between tabs
+storage.setItemWithSync('tabKey', { data: 'This data syncs between tabs.' });
+
+// Synchronizing with server
+storage.syncWithServer('https://api.example.com/data', 'POST', userData);
+
+// Session management
+storage.setSessionTimeout(15); // Clears storage after 15 minutes
+
+// Priority-based cleanup
+storage.cleanStorageByPriority('importantKey'); // Cleans other items
+
+
 ```
 ## Saving Data
 ```JavaScript
@@ -188,7 +229,24 @@ storage.setItemWithSync('tabKey', { data: 'This data syncs between tabs.' });
 
 ```
 
-### Configuration
+## Synchronizing with Server
+```javascript
+storage.syncWithServer('https://api.example.com/data', 'POST', userData);
+
+```
+## Session Management
+```javascript
+storage.setSessionTimeout(15); // Clears storage after 15 minutes
+
+```
+## Priority-based Cleanup
+```javascript
+storage.cleanStorageByPriority('importantKey'); // Cleans other items based on priority
+
+```
+
+
+# Configuration
 
 ## Encryption
 
