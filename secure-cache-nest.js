@@ -4,6 +4,7 @@ import LZString from 'lz-string';
 const SimpleStorage = (function () {
     const memoryCache = {};
     const history = {};
+    const logs = [];
     const MAX_STORAGE_SIZE = 5000;
     const channel = new BroadcastChannel('storage-sync');
     const eventListeners = {
@@ -37,6 +38,16 @@ const SimpleStorage = (function () {
         return bytes.toString(CryptoJS.enc.Utf8);
     }
 
+    function logAction(action, details) {
+        const logEntry = {
+            action,
+            details,
+            timestamp: new Date().toISOString(),
+        };
+        logs.push(logEntry);
+        console.log('Action Log:', logEntry);
+    }
+
     function triggerEvent(event, data) {
         if (eventListeners[event]) {
             eventListeners[event].forEach(callback => callback(data));
@@ -63,6 +74,7 @@ const SimpleStorage = (function () {
             expiry: expiry ? new Date().getTime() + expiry : null
         };
         localStorage.setItem(key, serialize(item));
+        logAction('set', { key, value });
         triggerEvent('set', { key, value });
     }
 
@@ -73,6 +85,7 @@ const SimpleStorage = (function () {
 
         if (item.expiry && new Date().getTime() > item.expiry) {
             localStorage.removeItem(key);
+            logAction('remove', { key });
             return null;
         }
 
@@ -89,11 +102,13 @@ const SimpleStorage = (function () {
 
     function removeItem(key) {
         localStorage.removeItem(key);
+        logAction('remove', { key });
         triggerEvent('remove', { key });
     }
 
     function clearStorage() {
         localStorage.clear();
+        logAction('clear', {});
         triggerEvent('clear', {});
     }
 
@@ -109,8 +124,10 @@ const SimpleStorage = (function () {
         });
 
         if (response.ok) {
+            logAction('syncWithGoogleDrive', { status: 'success' });
             console.log("Data successfully synced with Google Drive");
         } else {
+            logAction('syncWithGoogleDrive', { status: 'error', response });
             console.error("Error syncing with Google Drive");
         }
     }
@@ -126,6 +143,7 @@ const SimpleStorage = (function () {
         const db = await openIndexedDB();
         const tx = db.transaction('store', 'readwrite');
         tx.objectStore('store').put(value, key);
+        logAction('setItemIndexedDB', { key, value });
         return tx.complete;
     }
 
@@ -133,7 +151,9 @@ const SimpleStorage = (function () {
         const db = await openIndexedDB();
         const tx = db.transaction('store');
         const store = tx.objectStore('store');
-        return store.get(key);
+        const data = await store.get(key);
+        logAction('getItemIndexedDB', { key });
+        return data;
     }
 
     async function openIndexedDB() {
@@ -152,6 +172,7 @@ const SimpleStorage = (function () {
     function setItemEncrypted(key, value, secret) {
         const encryptedValue = encrypt(serialize(value), secret);
         localStorage.setItem(key, encryptedValue);
+        logAction('setItemEncrypted', { key });
         triggerEvent('set', { key, value });
     }
 
@@ -160,6 +181,7 @@ const SimpleStorage = (function () {
         const item = localStorage.getItem(key);
         if (!item) return null;
         const decryptedValue = decrypt(item, secret);
+        logAction('getItemDecrypted', { key });
         return deserialize(decryptedValue);
     }
 
@@ -167,22 +189,27 @@ const SimpleStorage = (function () {
     function setItemWithCache(key, value) {
         memoryCache[key] = value;
         localStorage.setItem(key, serialize(value));
+        logAction('setItemWithCache', { key, value });
         triggerEvent('set', { key, value });
     }
 
     function getItemWithCache(key) {
-        return memoryCache[key] || getItem(key);
+        const value = memoryCache[key] || getItem(key);
+        logAction('getItemWithCache', { key });
+        return value;
     }
 
     // Records change history
     function setItemWithHistory(key, value) {
         if (!history[key]) history[key] = [];
         history[key].push({ value, timestamp: new Date() });
+        logAction('setItemWithHistory', { key, value });
         setItem(key, value);
     }
 
     // Retrieves change history
     function getHistory(key) {
+        logAction('getHistory', { key });
         return history[key] || [];
     }
 
@@ -194,18 +221,19 @@ const SimpleStorage = (function () {
         }
         storedItems.push(value);
         localStorage.setItem(key, serialize(storedItems));
+        logAction('setItemWithLimit', { key, value });
     }
 
     // Cleans items based on priority
     function cleanStorageByPriority(priorityKey) {
         const items = Object.keys(localStorage);
         items.sort((a, b) => {
-            // Determine priority based on keys or some criteria
             return localStorage.getItem(a).length - localStorage.getItem(b).length;
         });
         items.forEach(key => {
             if (key !== priorityKey) {
                 localStorage.removeItem(key);
+                logAction('cleanStorageByPriority', { key });
             }
         });
     }
@@ -215,6 +243,7 @@ const SimpleStorage = (function () {
         const value = localStorage.getItem(key);
         if (value) {
             sessionStorage.setItem(key, value);
+            logAction('copyFromLocalToSession', { key });
         }
     }
 
@@ -223,6 +252,7 @@ const SimpleStorage = (function () {
         const value = sessionStorage.getItem(key);
         if (value) {
             localStorage.setItem(key, value);
+            logAction('copyFromSessionToLocal', { key });
         }
     }
 
@@ -235,6 +265,7 @@ const SimpleStorage = (function () {
             },
             body: JSON.stringify(body)
         });
+        logAction('syncWithServer', { apiEndpoint, method });
         return response.json();
     }
 
@@ -248,6 +279,7 @@ const SimpleStorage = (function () {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        logAction('backupData', { filename });
     }
 
     // Restores data from a file
@@ -256,46 +288,50 @@ const SimpleStorage = (function () {
         reader.onload = function(event) {
             const data = event.target.result;
             localStorage.setItem('your-key', data); // Change to the required key
+            logAction('restoreData', { file });
         };
         reader.readAsText(file);
     }
 
     // Synchronizes changes between tabs
     function setItemWithSync(key, value) {
-        localStorage.setItem(key, value);
+        setItem(key, value);
         channel.postMessage({ key, value });
     }
 
-    channel.onmessage = function(event) {
+    channel.onmessage = function (event) {
         const { key, value } = event.data;
-        localStorage.setItem(key, value);
-        triggerEvent('set', { key, value });
+        if (key && value) {
+            setItem(key, value);
+        }
     };
 
     return {
-        setItem, // Stores data in LocalStorage with support for encryption and compression
-        getItem, // Retrieves data from LocalStorage with support for decryption and decompression
-        removeItem, // Removes a specific item from LocalStorage
-        clearStorage, // Clears the entire LocalStorage
-        syncWithGoogleDrive, // Synchronizes data with Google Drive for backup
-        setSessionTimeout, // Sets a session timeout after which the storage is cleared
-        setItemIndexedDB, // Stores data in IndexedDB
-        getItemIndexedDB, // Retrieves data from IndexedDB
-        on, // Registers events for set, remove, and clear
-        triggerEvent, // Triggers set, remove, clear events
-        setItemEncrypted, // Stores encrypted data in LocalStorage
-        getItemDecrypted, // Retrieves and decrypts data from LocalStorage
-        setItemWithCache, // Stores data in memory for quick access (caching)
-        getItemWithCache, // Retrieves data from memory (cache)
-        setItemWithHistory, // Records change history of data
-        getHistory, // Retrieves change history for a specific key
-        setItemWithLimit, // Limits the number of stored items
-        cleanStorageByPriority, // Cleans items based on priority
-        copyFromLocalToSession, // Copies data from LocalStorage to SessionStorage
-        copyFromSessionToLocal, // Copies data from SessionStorage to LocalStorage
-        syncWithServer, // Synchronizes with the server via API
-        backupData, // Backs up data as a file
-        restoreData, // Restores data from a file
-        setItemWithSync // Synchronizes data changes between tabs using BroadcastChannel
+        setItem,
+        getItem,
+        removeItem,
+        clearStorage,
+        logAction,
+        on,
+        syncWithGoogleDrive,
+        setSessionTimeout,
+        setItemIndexedDB,
+        getItemIndexedDB,
+        setItemEncrypted,
+        getItemDecrypted,
+        setItemWithCache,
+        getItemWithCache,
+        setItemWithHistory,
+        getHistory,
+        setItemWithLimit,
+        cleanStorageByPriority,
+        copyFromLocalToSession,
+        copyFromSessionToLocal,
+        syncWithServer,
+        backupData,
+        restoreData,
+        setItemWithSync
     };
 })();
+
+export default SimpleStorage;
